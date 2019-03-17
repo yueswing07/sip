@@ -7,7 +7,8 @@
  注：请尊重原作者劳动成果，仅供学习使用，请勿盗用，违者必究！
  ================================================================
  */
-
+#include <stdio.h>
+#include <string.h>
 #include <iostream>
 #include <string>
 #include <sstream>
@@ -27,6 +28,7 @@
 
 #ifdef WIN32
 #include <winsock2.h>
+#define strcasecmp _stricmp
 #else
 #include <arpa/inet.h>
 #include <sys/types.h>
@@ -35,22 +37,6 @@
 #endif
 
 using namespace std;
-
-//本地监听IP
-#define LISTEN_ADDR ("61.149.194.174")
-//本地监听端口
-#define UACPORT ("5061")
-#define UACPORTINT (5061)
-//本UAC地址编码
-#define UACCODE ("30000025")
-//本地UAC密码
-#define UACPWD ("123456")
-//远程UAS IP
-#define UAS_ADDR ("47.112.105.194") // 47.112.105.194 192.168.2.251
-//远程UAS 端口
-#define UAS_PORT ("5060")
-//超时
-#define EXPIS 3600
 
 //当前服务状态 1 已经注册 0 未注册
 static int iCurrentStatus;
@@ -65,6 +51,87 @@ char *pSDP = "v=0\r\n"
 
 enum REGISTER_TYPE{REGISTER,UNREGISTER,REFRESHED};
 static REGISTER_TYPE registerType=REGISTER;
+struct sConfig
+{
+    int uacPortInt;
+    char listenAddr[128];
+    char uacPort[16];
+    char uacCode[64];
+    char uacPwd[64];
+    char uasAddr[64];
+    char uasPort[16];
+    int expis;
+} sConfig;
+void readCfg(char *filename, struct sConfig* sConfig);
+/**
+ * read sConfig from httpd.conf 
+ * parameters : file name 
+ * return 
+ */
+void readCfg(char *filename, struct sConfig* sConfig)
+{
+    FILE *pf = NULL;
+    char buf[2048];
+    int i = 0,j = 0;
+    char key[128];
+    char val[128];
+
+    pf = fopen(filename, "r+");
+    if (NULL==pf){
+        perror("open sConfig file error. use default sConfig.");
+        return;
+    }
+    while(!feof(pf)) {
+        fgets(buf,2048,pf);
+        i = 0; j = 0;
+        printf("%s\n", buf);
+		if ('#'==buf[0]) continue;
+        // get key 
+        while (!isspace(buf[i]) && (i < strlen(buf) - 1))
+        {
+            key[j] = buf[i];
+            i++;
+            j++;
+        }
+        key[j] = 0;
+        printf("%s\n", key);
+
+        //if ('#'==key[0]) continue;
+        // get val
+        i++; j=0;
+        while (!isspace(buf[i]) && (i < strlen(buf) - 1))
+        {
+            val[j] = buf[i];
+            i++;
+            j++;
+        }
+        val[j] = 0;
+
+        if( strcasecmp(key,"listenAddr")==0 ) {
+            strncpy(sConfig->listenAddr,val,128);
+        }
+        if( strcasecmp(key,"uacPort")==0 ) {
+            strncpy(sConfig->uacPort,val,128);
+            sConfig->uacPortInt = atoi(val);
+        }
+        if( strcasecmp(key,"uacCode")==0 ) {
+            strncpy(sConfig->uacCode,val,128);
+        }
+        if( strcasecmp(key,"uacPwd")==0 ) {
+            strncpy(sConfig->uacPwd,val,128);
+        }
+        if( strcasecmp(key,"uasAddr")==0 ) {
+            strncpy(sConfig->uasAddr,val,128);
+        }
+        if( strcasecmp(key,"uasPort")==0 ) {
+            strncpy(sConfig->uasPort,val,128);
+        }
+        if( strcasecmp(key,"expis")==0 ) {
+            sConfig->expis = atoi(val);
+        }
+    }
+    fclose(pf);
+}
 /* 该方法一般取出的ip为 127.0.0.1 ,windows也可以使用此类方法,但是需要略为改动*/
 int get_local_ip_using_hostname(char *str_ip) 
 {
@@ -276,14 +343,14 @@ void Register()
     }
 	registerType=REFRESHED;
     CSipFromToHeader stFrom;
-    stFrom.SetHeader(UACCODE, UAS_ADDR, UAS_PORT);
+    stFrom.SetHeader(sConfig.uacCode, sConfig.uasAddr, sConfig.uasPort);
     CSipFromToHeader stTo;
-    stTo.SetHeader(UACCODE, UAS_ADDR, UAS_PORT);
+    stTo.SetHeader(sConfig.uacCode, sConfig.uasAddr, sConfig.uasPort);
     CContractHeader stContract;
-    stContract.SetContractHeader(UACCODE, LISTEN_ADDR, UACPORT);
+    stContract.SetContractHeader(sConfig.uacCode, sConfig.listenAddr, sConfig.uacPort);
     //发送注册信息
     int registerId = 0;
-    if (0 > SendRegister(registerId, stFrom, stTo, stContract, UACCODE, UACPWD,
+    if (0 > SendRegister(registerId, stFrom, stTo, stContract, sConfig.uacCode, sConfig.uacPwd,
             3000, 0))
     {
         cout << "发送注册失败" << endl;
@@ -302,13 +369,13 @@ void RefreshRegister()
     }
 	registerType=REFRESHED;
     CSipFromToHeader stFrom;
-    stFrom.SetHeader(UACCODE, UAS_ADDR, UAS_PORT);
+    stFrom.SetHeader(sConfig.uacCode, sConfig.uasAddr, sConfig.uasPort);
     CSipFromToHeader stTo;
-    stTo.SetHeader(UACCODE, UAS_ADDR, UAS_PORT);
+    stTo.SetHeader(sConfig.uacCode, sConfig.uasAddr, sConfig.uasPort);
     CContractHeader stContract;
-    stContract.SetContractHeader(UACCODE, LISTEN_ADDR, UACPORT);
+    stContract.SetContractHeader(sConfig.uacCode, sConfig.listenAddr, sConfig.uacPort);
     //发送注册信息
-    if (0 > SendRegister(iHandle, stFrom, stTo, stContract, UACCODE, UACPWD,
+    if (0 > SendRegister(iHandle, stFrom, stTo, stContract, sConfig.uacCode, sConfig.uacPwd,
             3000, 1))
     {
         cout << "发送刷新注册失败" << endl;
@@ -325,13 +392,15 @@ void UnRegister()
     }
 	registerType=UNREGISTER;
     CSipFromToHeader stFrom;
-    stFrom.SetHeader(UACCODE, UAS_ADDR, UAS_PORT);
+    stFrom.SetHeader(sConfig.uacCode, sConfig.uasAddr, sConfig.uasPort);
+    // stFrom.SetHeader(UACCODE, UAS_ADDR, UAS_PORT);
     CSipFromToHeader stTo;
-    stTo.SetHeader(UACCODE, UAS_ADDR, UAS_PORT);
+    stTo.SetHeader(sConfig.uacCode, sConfig.uasAddr, sConfig.uasPort);
+    // stTo.SetHeader(UACCODE, UAS_ADDR, UAS_PORT);
     CContractHeader stContract;
-    stContract.SetContractHeader(UACCODE, LISTEN_ADDR, UACPORT);
+    stContract.SetContractHeader(sConfig.uacCode, sConfig.listenAddr, sConfig.uacPort);
     //发送注册信息
-    if (0 > SendRegister( iHandle, stFrom, stTo, stContract, UACCODE, UACPWD,
+    if (0 > SendRegister( iHandle, stFrom, stTo, stContract, sConfig.uacCode, sConfig.uacPwd,
             0, 2))
     {
         cout << "发送注销失败" << endl;
@@ -398,7 +467,7 @@ static void help()
 //服务处理线程
 void *serverHandle(void *pUser)
 {
-//    sleep(3);
+    // sleep(3);
     help();
     char ch = getchar();
     getchar();
@@ -504,79 +573,19 @@ void *eventHandle(void *pUser)
     return NULL;
 }
 
-struct Config
-{
-    int uacPortInt;
-    char listenAddr[128];
-    char uacPort[16];
-    char uacCode[64];
-	char uacPwd[64];
-	char uasAddr[64];
-	char uasPort[16];
-	int expis;
-} sConfig;
-void readCfg(char *filename, struct Config* sConfig);
-/**
- * read config from httpd.conf 
- * parameters : file name 
- * return 
- */
-void readCfg(char *filename, struct Config* sConfig)
-{
-    FILE *pf = NULL;
-    char buf[2048];
-    int i = 0,j = 0;
-    char key[128];
-    char val[128];
-
-    pf = fopen(filename, "r+");
-    if (NULL==pf){
-        perror("open config file error. use default config.");
-        return;
-    }
-    while(!feof(pf)) {
-        fgets(buf,2048,pf);
-        i = 0; j = 0;
-        printf("%s\n", buf);
-        // get key 
-        while (!ISspace(buf[i]) && (i < strlen(buf) - 1))
-        {
-            key[j] = buf[i];
-            i++;
-            j++;
-        }
-        key[j] = 0;
-        printf("%s\n", key);
-
-        if ('#'==key[0]) continue;
-        // get val
-        i++; j=0;
-        while (!ISspace(buf[i]) && (i < strlen(buf) - 1))
-        {
-            val[j] = buf[i];
-            i++;
-            j++;
-        }
-        val[j] = 0;
-        printf("%s\n", val);
-
-        if( strcasecmp(key,"port")==0 ) {
-            sConfig->port = atoi(val);
-        }
-
-        if( strcasecmp(key,"rootDir")==0 ) {
-            strncpy(sConfig->rootDir,val,128);
-        }
-    }
-    fclose(pf);
-}
-
 int main()
 {
 
-    char* configFilename = "sip.conf";
-	sConfig config;
-	readCfg(configFilename,config);
+    char* sConfigFilename = "sip.conf";
+    strncpy(sConfig.listenAddr,"61.149.194.174",64);
+    strncpy(sConfig.uacPort, "5061", 16);
+    sConfig.uacPortInt = 5061;
+    strncpy(sConfig.uacCode, "30000025", 64);
+    strncpy(sConfig.uacPwd, "123456",64);
+    strncpy(sConfig.uasAddr, "47.112.105.194", 46);
+    strncpy(sConfig.uasPort, "5060", 16);
+    sConfig.expis = 3600;
+	readCfg(sConfigFilename,&sConfig);
 	iCurrentStatus = 0;
     //库处理结果
     int result = OSIP_SUCCESS;
@@ -589,7 +598,7 @@ int main()
     cout << "eXosip_init success." << endl;
     eXosip_set_user_agent(NULL);
     //监听
-    if (OSIP_SUCCESS != eXosip_listen_addr(IPPROTO_UDP, NULL, UACPORTINT,
+    if (OSIP_SUCCESS != eXosip_listen_addr(IPPROTO_UDP, NULL, sConfig.uacPortInt,
             AF_INET, 0))
     {
         printf("eXosip_listen_addr failure.\n");
@@ -598,7 +607,8 @@ int main()
     //设置监听网卡
     if (OSIP_SUCCESS != eXosip_set_option(
     EXOSIP_OPT_SET_IPV4_FOR_GATEWAY,
-            LISTEN_ADDR))
+            sConfig.listenAddr))
+            // LISTEN_ADDR))
     {
         return -1;
     }
