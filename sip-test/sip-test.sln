@@ -1,0 +1,32 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sip-sever", "sip-test.vcxproj", "{1D8F89BC-6FC7-4108-9333-FA8947BA897D}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sip-client", "..\sip-client\sip-client.vcxproj", "{4414BE66-30E8-410F-819F-22905E3E860C}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sip-uac28181", "..\sip-uac28181\sip-uac28181.vcxproj", "{086F24D0-D0B0-4A4B-9DB0-B97B3DBE9EEE}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{1D8F89BC-6FC7-4108-9333-FA8947BA897D}.Debug|Win32.ActiveCfg = Debug|Win32
+		{1D8F89BC-6FC7-4108-9333-FA8947BA897D}.Debug|Win32.Build.0 = Debug|Win32
+		{1D8F89BC-6FC7-4108-9333-FA8947BA897D}.Release|Win32.ActiveCfg = Release|Win32
+		{1D8F89BC-6FC7-4108-9333-FA8947BA897D}.Release|Win32.Build.0 = Release|Win32
+		{4414BE66-30E8-410F-819F-22905E3E860C}.Debug|Win32.ActiveCfg = Debug|Win32
+		{4414BE66-30E8-410F-819F-22905E3E860C}.Debug|Win32.Build.0 = Debug|Win32
+		{4414BE66-30E8-410F-819F-22905E3E860C}.Release|Win32.ActiveCfg = Release|Win32
+		{4414BE66-30E8-410F-819F-22905E3E860C}.Release|Win32.Build.0 = Release|Win32
+		{086F24D0-D0B0-4A4B-9DB0-B97B3DBE9EEE}.Debug|Win32.ActiveCfg = Debug|Win32
+		{086F24D0-D0B0-4A4B-9DB0-B97B3DBE9EEE}.Debug|Win32.Build.0 = Debug|Win32
+		{086F24D0-D0B0-4A4B-9DB0-B97B3DBE9EEE}.Release|Win32.ActiveCfg = Release|Win32
+		{086F24D0-D0B0-4A4B-9DB0-B97B3DBE9EEE}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
