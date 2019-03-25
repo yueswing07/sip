@@ -42,12 +42,89 @@ using namespace std;
 static int iCurrentStatus;
 //注册成功HANDLE
 static int iHandle = -1;
+int callId = -1;
+int dialogId = -1;
 
-char *pSDP = "v=0\r\n"
-                      "o=anonymous 0 0 IN IP4 0.0.0.0\r\n"
-                      "t=1 10\r\n"
-                      "a=username:rainfish\r\n"
-                      "a=password:123\r\n";
+char *pEnterClass = "v=0\r\n"
+"o=- 3761910912 3761910915 IN IP4 47.112.105.194\r\n"
+"s=butelmedia\r\n"
+"t=0 0\r\n"
+"m=audio 5061 RTP/AVP 98 97 99 0 8\r\n"
+"c=IN IP4 61.149.194.174\r\n"
+"a=sendrecv\r\n"
+"a=rtpmap:98 speex/16000\r\n"
+"a=rtpmap:97 speex/8000\r\n"
+"a=rtpmap:99 speex/32000\r\n"
+"a=rtpmap:0 PCMU/8000\r\n"
+"a=rtpmap:8 PCMA/8000\r\n"
+"a=ssrc:2066561799 cname:30000025\r\n"
+"a=mid:audio-1\r\n"
+"a=rtcp-mux\r\n"
+"a=audiodesc:mic-audio\r\n"
+//"m=video 5061 RTP/AVP 97\r\n"
+//"c=IN IP4 61.149.194.174\r\n"
+//"a=sendrecv\r\n"
+//"a=rtpmap:97 H264/90000\r\n"
+//"a=fmtp:97 profile-level-id=42e01e; packetization-mode=1\r\n"
+//"a=ssrc:931412768 cname:30000025\r\n"
+//"a=mid:video-1\r\n"
+//"a=rtcp-mux\r\n"
+//"a=videodesc:camera\r\n"
+;
+char *pShareCourseware = "v=0\r\n"
+"o=- 3761910912 3761910915 IN IP4 47.112.105.194\r\n"
+"s=butelmedia\r\n"
+"t=0 0\r\n"
+"m=audio 5061 RTP/AVP 98 97 99 0 8\r\n"
+"c=IN IP4 61.149.194.174\r\n"
+"a=sendrecv\r\n"
+"a=rtpmap:98 speex/16000\r\n"
+"a=rtpmap:97 speex/8000\r\n"
+"a=rtpmap:99 speex/32000\r\n"
+"a=rtpmap:0 PCMU/8000\r\n"
+"a=rtpmap:8 PCMA/8000\r\n"
+"a=ssrc:2066561799 cname:30000025\r\n"
+"a=mid:audio-1\r\n"
+"a=rtcp-mux\r\n"
+"a=audiodesc:mic-audio\r\n"
+;
+char *pCancelCourseware = "v=0\r\n"
+"o=- 3761910912 3761910915 IN IP4 47.112.105.194\r\n"
+"s=butelmedia\r\n"
+"t=0 0\r\n"
+"m=audio 5061 RTP/AVP 98 97 99 0 8\r\n"
+"c=IN IP4 61.149.194.174\r\n"
+"a=sendrecv\r\n"
+"a=rtpmap:98 speex/16000\r\n"
+"a=rtpmap:97 speex/8000\r\n"
+"a=rtpmap:99 speex/32000\r\n"
+"a=rtpmap:0 PCMU/8000\r\n"
+"a=rtpmap:8 PCMA/8000\r\n"
+"a=ssrc:2066561799 cname:30000025\r\n"
+"a=mid:audio-1\r\n"
+"a=rtcp-mux\r\n"
+"a=audiodesc:mic-audio\r\n"
+;
+
+char *pAssignInteraction = "<?xml version=\"1.0\"encoding=\"UTF-8\"?>"
+"<Notify>"
+"<SN>11</SN>"
+"<CmdType>Interact</CmdType>"
+"< UserIDList>"
+"<UserID>30000026</UserID>"
+"</UserIDList>"
+"</Notify>";
+char *pCancelInteraction = "<?xml version=\"1.0\"encoding=\"UTF-8\"?>"
+"<Notify>"
+"<SN>11</SN>"
+"<CmdType>Interact</CmdType>"
+"</Notify>";
+char *pSwitchCamera = "<?xml version=\"1.0\"encoding=\"UTF-8\"?>"
+"<Control>"
+"<SN>11</SN>"
+"<CmdType>CameraChange</CmdType>"
+"<UserID>30000026</UserID>"
+"</Control>";
 
 enum REGISTER_TYPE{REGISTER,UNREGISTER,REFRESHED};
 static REGISTER_TYPE registerType=REGISTER;
@@ -60,9 +137,11 @@ struct sConfig
     char uacPwd[64];
     char uasAddr[64];
     char uasPort[16];
+    char classId[64];
     int expis;
-} sConfig;
-void readCfg(char *filename, struct sConfig* sConfig);
+} ;
+static struct sConfig sConfig;
+
 /**
  * read sConfig from httpd.conf 
  * parameters : file name 
@@ -85,7 +164,7 @@ void readCfg(char *filename, struct sConfig* sConfig)
         fgets(buf,2048,pf);
         i = 0; j = 0;
         printf("%s\n", buf);
-		if ('#'==buf[0]) continue;
+        if ('#'==buf[0]) continue;
         // get key 
         while (!isspace(buf[i]) && (i < strlen(buf) - 1))
         {
@@ -126,55 +205,14 @@ void readCfg(char *filename, struct sConfig* sConfig)
         if( strcasecmp(key,"uasPort")==0 ) {
             strncpy(sConfig->uasPort,val,128);
         }
+        if( strcasecmp(key,"classId")==0 ) {
+            strncpy(sConfig->classId,val,128);
+        }
         if( strcasecmp(key,"expis")==0 ) {
             sConfig->expis = atoi(val);
         }
     }
     fclose(pf);
-}
-/* 该方法一般取出的ip为 127.0.0.1 ,windows也可以使用此类方法,但是需要略为改动*/
-int get_local_ip_using_hostname(char *str_ip) 
-{
-    int status = -1;
-    int i = 0;
-    char buf[128] = {0};
-    char *local_ip = NULL;
-#ifdef WIN32
-    WSADATA wsadata;
-    if(0 != WSAStartup(MAKEWORD(2, 2), &wsadata))   //初始化
-    {
-        printf("初始化网络环境失败!");
-        return -1;
-    }
-#endif
-    if (gethostname(buf, sizeof(buf)) == 0)
-    {
-        struct hostent *temp_he;
-        temp_he = gethostbyname(buf);
-        if (temp_he) 
-        {
-            char **pptr = temp_he->h_addr_list;
-            for(; *pptr != NULL; pptr++)
-            {
-                local_ip = NULL;
-                local_ip = inet_ntoa(*(struct in_addr *)(*pptr));
-                if(local_ip)
-                {
-                    strcpy(str_ip, local_ip);
-                    status = 0;
-                    printf("ip:%s",local_ip);
-                    if(strcmp("127.0.0.1", str_ip))
-                    {
-                        //break;
-                    }
-                }
-            }
-        }
-    }
-#ifdef WIN32
-    WSACleanup();
-#endif
-    return status;
 }
 
 //SIP From/To 头部
@@ -341,7 +379,7 @@ void Register()
         cout << "当前已经注册" << endl;
         return;
     }
-	registerType=REFRESHED;
+    registerType=REFRESHED;
     CSipFromToHeader stFrom;
     stFrom.SetHeader(sConfig.uacCode, sConfig.uasAddr, sConfig.uasPort);
     CSipFromToHeader stTo;
@@ -367,7 +405,7 @@ void RefreshRegister()
         cout << "当前未注册，不允许刷新" << endl;
         return;
     }
-	registerType=REFRESHED;
+    registerType=REFRESHED;
     CSipFromToHeader stFrom;
     stFrom.SetHeader(sConfig.uacCode, sConfig.uasAddr, sConfig.uasPort);
     CSipFromToHeader stTo;
@@ -390,7 +428,7 @@ void UnRegister()
         cout << "当前未注册，不允许注销" << endl;
         return;
     }
-	registerType=UNREGISTER;
+    registerType=UNREGISTER;
     CSipFromToHeader stFrom;
     stFrom.SetHeader(sConfig.uacCode, sConfig.uasAddr, sConfig.uasPort);
     // stFrom.SetHeader(UACCODE, UAS_ADDR, UAS_PORT);
@@ -411,23 +449,128 @@ void UnRegister()
 }
 // 加入课堂
 void enterClass(){
+    osip_message_t *invite=NULL;
+    int ret;
+    char tmp[4096];
 
+    CSipFromToHeader stFrom;
+    stFrom.SetHeader(sConfig.uacCode, sConfig.uasAddr, sConfig.uasPort);
+    CSipFromToHeader stTo;
+    stTo.SetHeader(sConfig.classId, sConfig.uasAddr, sConfig.uasPort);
+    CContractHeader stContract;
+    stContract.SetContractHeader(sConfig.uacCode, sConfig.listenAddr, sConfig.uacPort);
+    ret = eXosip_call_build_initial_invite(&invite,stTo.GetFormatHeader().c_str(),stFrom.GetFormatHeader().c_str(),NULL,NULL); // "This is a call for conversation"
+    if(ret!=0)
+    {
+        printf("Initial INVITE failed!\n");
+    }
+    //符合SDP格式，其中属性a是自定义格式，也就是说可以存放自己的信息，
+    //但是只能有两列，比如帐户信息
+    //但是经过测试，格式vot必不可少，原因未知，估计是协议栈在传输时需要检查的
+    snprintf(tmp,4096,pEnterClass);
+
+    osip_message_set_body(invite,tmp,strlen(tmp));
+    osip_message_set_content_type(invite,"application/sdp");
+
+    eXosip_lock();
+    callId = eXosip_call_send_initial_invite(invite); //invite SIP INVITE message to send
+    if (callId < 0)
+    {
+        printf("send INVITE failed!\n");
+    }
+    eXosip_unlock();
 }
 // 退出课堂
 void leaveClass()
 {
+    int ret;
+
+    eXosip_lock();
+    ret = eXosip_call_terminate(callId,dialogId); //invite SIP INVITE message to send
+    eXosip_unlock();
 }
 // 指定互动
 void assignInteraction()
 {
+    osip_message_t *message=NULL;
+    int ret;
+    char tmp[4096];
+
+    CSipFromToHeader stFrom;
+    stFrom.SetHeader(sConfig.uacCode, sConfig.uasAddr, sConfig.uasPort);
+    CSipFromToHeader stTo;
+    stTo.SetHeader(sConfig.classId, sConfig.uasAddr, sConfig.uasPort);
+    CContractHeader stContract;
+    stContract.SetContractHeader(sConfig.uacCode, sConfig.listenAddr, sConfig.uacPort);
+    eXosip_message_build_request(&message,"MESSAGE",stTo.GetFormatHeader().c_str(),stFrom.GetFormatHeader().c_str(),NULL);
+    //内容，方法 to from route 
+    snprintf(tmp,4096,pAssignInteraction);
+    osip_message_set_body(message,tmp,strlen(tmp));
+    osip_message_set_content_type(message,"Application/MANSCDP+xml");
+    eXosip_lock();
+    ret = eXosip_message_send_request(message);
+    if (ret < 0)
+    {
+        printf("send message failed!\n");
+    }
+    eXosip_unlock();
 }
 // 取消互动
 void cancelInteraction()
 {
+    osip_message_t *message=NULL;
+    int ret;
+    char tmp[4096];
+
+    CSipFromToHeader stFrom;
+    stFrom.SetHeader(sConfig.uacCode, sConfig.uasAddr, sConfig.uasPort);
+    CSipFromToHeader stTo;
+    stTo.SetHeader(sConfig.classId, sConfig.uasAddr, sConfig.uasPort);
+    CContractHeader stContract;
+    stContract.SetContractHeader(sConfig.uacCode, sConfig.listenAddr, sConfig.uacPort);
+    eXosip_message_build_request(&message,"MESSAGE",stTo.GetFormatHeader().c_str(),stFrom.GetFormatHeader().c_str(),NULL);
+    //内容，方法 to from route
+    snprintf(tmp,4096,pCancelInteraction);
+    osip_message_set_body(message,tmp,strlen(tmp));
+    osip_message_set_content_type(message,"Application/MANSCDP+xml");
+    eXosip_lock();
+    ret = eXosip_message_send_request(message);
+    if (ret < 0)
+    {
+        printf("send message failed!\n");
+    }
+    eXosip_unlock();
 }
 // 共享课件
 void shareCourseware()
 {
+    osip_message_t *invite=NULL;
+    int ret;
+    char tmp[4096];
+
+    CSipFromToHeader stFrom;
+    stFrom.SetHeader(sConfig.uacCode, sConfig.uasAddr, sConfig.uasPort);
+    CSipFromToHeader stTo;
+    stTo.SetHeader(sConfig.classId, sConfig.uasAddr, sConfig.uasPort);
+    CContractHeader stContract;
+    stContract.SetContractHeader(sConfig.uacCode, sConfig.listenAddr, sConfig.uacPort);
+    ret = eXosip_call_build_initial_invite(&invite,stTo.GetFormatHeader().c_str(),stFrom.GetFormatHeader().c_str(),NULL,NULL); // "This is a call for conversation"
+    if(ret!=0)
+    {
+        printf("Initial INVITE failed!\n");
+    }
+    snprintf(tmp,4096,pShareCourseware);
+
+    osip_message_set_body(invite,tmp,strlen(tmp));
+    osip_message_set_content_type(invite,"application/sdp");
+
+    eXosip_lock();
+    callId = eXosip_call_send_initial_invite(invite); //invite SIP INVITE message to send
+    if (callId < 0)
+    {
+        printf("send INVITE failed!\n");
+    }
+    eXosip_unlock();
 }
 // 取消共享课件
 void cancelCourseware()
@@ -436,31 +579,48 @@ void cancelCourseware()
 // 切换镜头
 void switchCamera()
 {
+    osip_message_t *message=NULL;
+    int ret;
+    char tmp[4096];
+
+    CSipFromToHeader stFrom;
+    stFrom.SetHeader(sConfig.uacCode, sConfig.uasAddr, sConfig.uasPort);
+    CSipFromToHeader stTo;
+    stTo.SetHeader(sConfig.classId, sConfig.uasAddr, sConfig.uasPort);
+    CContractHeader stContract;
+    stContract.SetContractHeader(sConfig.uacCode, sConfig.listenAddr, sConfig.uacPort);
+    eXosip_message_build_request(&message,"MESSAGE",stTo.GetFormatHeader().c_str(),stFrom.GetFormatHeader().c_str(),NULL);
+    //内容，方法 to from route
+    snprintf(tmp,4096,pSwitchCamera);
+    osip_message_set_body(message,tmp,strlen(tmp));
+    osip_message_set_content_type(message,"Application/MANSCDP+xml");
+    eXosip_lock();
+    ret = eXosip_message_send_request(message);
+    if (ret < 0)
+    {
+        printf("send message failed!\n");
+    }
+    eXosip_unlock();
 }
 static void help()
 {
     const char
             *b =
     "-------------------------------------------------------------------------------\n"
-    "SIP Library test process - uac v 1.0 (June 13, 2014)\n\n"
-    "SIP UAC端 注册,刷新注册,注销实现\n\n"
-    "Author: 程序人生\n\n"
-    "博客地址:http://blog.csdn.net/hiwubihe QQ:1269122125\n\n"
-    "-------------------------------------------------------------------------------\n"
-    "\n"
     "              0:Register\n"
     "              1:RefreshRegister\n"
     "              2:UnRegister\n"
     "              3:clear scream\n"
-    "              4:exit\n"
+    "              q:exit\n"
     "              5:enterClass\n"
     "              6:leaveClass\n"
     "              7:assignInteraction\n"
     "              8:cancelInteraction\n"
     "              9:shareCourseware\n"
-    "              10:cancelCourseware\n"
+    "              a:cancelCourseware\n"
+    "              b:switchCamera\n"
     "-------------------------------------------------------------------------------\n"
-    "\n";
+    ;
     fprintf(stderr, b, strlen(b));
     cout << "please select method :";
 }
@@ -494,7 +654,7 @@ void *serverHandle(void *pUser)
                 exit(1);
             }
             break;
-        case '4':
+        case 'q':
             cout << "exit sipserver......" << endl;
             getchar();
             exit(0);
@@ -513,15 +673,18 @@ void *serverHandle(void *pUser)
         case '9':
             shareCourseware();
             break;
-        case '10':
+        case 'a':
             cancelCourseware();
+            break;
+        case 'b':
+            switchCamera();
             break;
         default:
             cout << "select error" << endl;
             break;
         }
-        cout << "press any key to continue......" << endl;
-        getchar();
+        //cout << "press any key to continue......" << endl;
+        //getchar();
         help();
         ch = getchar();
         getchar();
@@ -533,6 +696,7 @@ void *serverHandle(void *pUser)
 //DWORD WINAPI eventHandle(LPVOID lpParameter)
 void *eventHandle(void *pUser)
 {
+    osip_message_t *ack=NULL;
     eXosip_event_t* osipEventPtr = (eXosip_event_t*) pUser;
     switch (osipEventPtr->type)
     {
@@ -540,21 +704,21 @@ void *eventHandle(void *pUser)
         case EXOSIP_REGISTRATION_SUCCESS:
             cout<<"REGISTRATION_SUCCESS 收到状态码:"<<osipEventPtr->response->status_code<<"报文"<<endl;
             if(registerType==REFRESHED) 
-			iCurrentStatus = 1;
-			if(registerType==UNREGISTER) 
-			iCurrentStatus = -1;
+            iCurrentStatus = 1;
+            if(registerType==UNREGISTER) 
+            iCurrentStatus = -1;
             break;
         case EXOSIP_REGISTRATION_FAILURE:
-            cout<<"REGISTRATION_SUCCESS 收到状态码:"<<osipEventPtr->response->status_code<<"报文"<<endl;
-            cout<<"发送鉴权报文"<<endl;
-            Register();
+            cout<<"REGISTRATION_FAILURE 收到状态码:"<<osipEventPtr->response->status_code<<"报文"<<endl;
+            //cout<<"发送鉴权报文"<<endl;
+            //Register();
             break;
-		case EXOSIP_REGISTRATION_REFRESHED:
-			cout<<"收到状态码:"<<osipEventPtr->response->status_code<<"报文"<<endl;
+        case EXOSIP_REGISTRATION_REFRESHED:
+            cout<<"收到状态码:"<<osipEventPtr->response->status_code<<"报文"<<endl;
             cout<<"REFRESHED 成功"<<endl;
             break;
-		case EXOSIP_REGISTRATION_TERMINATED:
-			cout<<"收到状态码:"<<osipEventPtr->response->status_code<<"报文"<<endl;
+        case EXOSIP_REGISTRATION_TERMINATED:
+            cout<<"收到状态码:"<<osipEventPtr->response->status_code<<"报文"<<endl;
             if(osipEventPtr->response->status_code == 200)
             {
                 cout<<"TERMINATED 成功"<<endl;
@@ -563,6 +727,58 @@ void *eventHandle(void *pUser)
             {
                 cout<<"注册失败"<<endl;
             }
+            break;
+        case EXOSIP_CALL_INVITE:   //收到一个INVITE请求
+            printf("a new invite received!\n");
+            break;
+        case EXOSIP_CALL_REINVITE:   //收到一个REINVITE请求
+            printf("REINVITE a new INVITE within call received!\n");
+            eXosip_lock ();
+            eXosip_call_send_answer (osipEventPtr->tid, 180, NULL);
+            eXosip_unlock ();
+            eXosip_lock ();
+            eXosip_call_send_answer (osipEventPtr->tid, 200, NULL);
+            eXosip_unlock ();
+            break;
+        case EXOSIP_CALL_PROCEEDING: //收到100 trying消息，表示请求正在处理中
+            printf("proceeding!\n");
+            break;
+        case EXOSIP_CALL_RINGING:   //收到180 Ringing应答，表示接收到INVITE请求的UAS正在向被叫用户振铃
+            printf("ringing!\n");
+            printf("call_id is %d,dialog_id is %d \n",osipEventPtr->cid,osipEventPtr->did);
+            break;
+        case EXOSIP_CALL_ANSWERED: //收到200 OK，表示请求已经被成功接受，用户应答
+            printf("ok!connected!\n");
+            callId=osipEventPtr->cid;
+            dialogId=osipEventPtr->did;
+            printf("call_id is %d,dialog_id is %d \n",osipEventPtr->cid,osipEventPtr->did);
+
+            //回送ack应答消息
+            eXosip_call_build_ack(osipEventPtr->did,&ack);
+            eXosip_call_send_ack(osipEventPtr->did,ack);
+            break;
+        case EXOSIP_CALL_ACK: //ACK received for 200ok to INVITE
+            printf("ACK received!\n");
+            break;
+        case EXOSIP_CALL_MESSAGE_ANSWERED:
+            printf(" call message answered \n");
+            break;        
+        case EXOSIP_CALL_CLOSED: //a BYE was received for this call
+            printf("the other sid closed!\n");
+            break;
+        case EXOSIP_CALL_RELEASED:
+            printf("call context is cleared.\n");
+            callId = -1;
+            dialogId = -1;
+            break;
+        case EXOSIP_MESSAGE_NEW:
+            printf("message new \n");
+            eXosip_lock ();
+            eXosip_call_send_answer (osipEventPtr->did, 200, NULL);
+            eXosip_unlock ();
+            break;
+        case EXOSIP_MESSAGE_ANSWERED:
+            printf("message answered \n");
             break;
         default:
             cout << "The sip event type that not be precessed.the event "
@@ -585,8 +801,8 @@ int main()
     strncpy(sConfig.uasAddr, "47.112.105.194", 46);
     strncpy(sConfig.uasPort, "5060", 16);
     sConfig.expis = 3600;
-	readCfg(sConfigFilename,&sConfig);
-	iCurrentStatus = 0;
+    readCfg(sConfigFilename,&sConfig);
+    iCurrentStatus = 0;
     //库处理结果
     int result = OSIP_SUCCESS;
     //初始化库
